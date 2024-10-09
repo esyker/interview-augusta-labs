@@ -1,0 +1,5 @@
+**/__pycache__/**
+src/__streamlit_temp__
+src/__temp__
+**/.venv
+**/.env
