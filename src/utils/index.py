@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+from typing import List, Dict
 
 class Index:
     """
@@ -16,7 +17,7 @@ class Index:
         docs (list): List of documents indexed.
     """
 
-    def __init__(self, text_fields, keyword_fields, vectorizer_params={}):
+    def __init__(self, text_fields : List[str], keyword_fields : List[str], vectorizer_params={}):
         """
         Initializes the Index with specified text and keyword fields.
 
