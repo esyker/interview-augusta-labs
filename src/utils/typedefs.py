@@ -51,7 +51,7 @@ class Article(DictMixin):
     sections: Dict[str, ArticleSection]
     
 @dataclass
-class ArticleChunk:
+class ArticleChunk(DictMixin):
     chunk_id : str
     chunk_text : str
     n_tokens : int
@@ -59,11 +59,26 @@ class ArticleChunk:
     article : Article
     
     @staticmethod
-    def get_text_field_name():
+    def get_text_fields_names():
         '''Return the name of the length field'''
-        return "chunk_text"
+        return ["chunk_text"]
     
     @staticmethod
-    def get_length_field_name():
+    def get_length_fields_names():
         '''Return the name of the length field'''
-        return "n_tokens"
+        return ["n_tokens"]
+
+@dataclass
+class SearchResult(DictMixin):
+    similarity : float
+    chunk : ArticleChunk
+
+@dataclass
+class SearchResultsGroupedByDoc(DictMixin):
+    mean_similarity: float
+    max_similarity : float
+    min_similarity : float
+    weighted_similarity : float
+    article : Article
+    max_similarity_chunk : ArticleChunk
+    search_results_list : List[SearchResult]
