@@ -69,16 +69,25 @@ class ArticleChunk(DictMixin):
         return ["n_tokens"]
 
 @dataclass
+class QueryScoresVectors(DictMixin):
+    query : str
+    query_vecs : List[float]
+    scores : List[float]
+    top_indices : List[int]
+
+@dataclass
 class SearchResult(DictMixin):
+    query : str
     similarity : float
     chunk : ArticleChunk
 
 @dataclass
 class SearchResultsGroupedByDoc(DictMixin):
+    weighted_similarity : float
+    max_similarity_chunk : SearchResult
+    query : str
     mean_similarity: float
     max_similarity : float
     min_similarity : float
-    weighted_similarity : float
     article : Article
-    max_similarity_chunk : ArticleChunk
     search_results_list : List[SearchResult]

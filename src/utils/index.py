@@ -4,7 +4,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from typing import List, Dict
-from .typedefs import ArticleChunk, SearchResult, SearchResultsGroupedByDoc
+from .typedefs import ArticleChunk, SearchResult, SearchResultsGroupedByDoc, Article, QueryScoresVectors
+from scipy import sparse
 
 class Index:
     """
@@ -47,18 +48,7 @@ class Index:
 
         return self
 
-    def search(self, query, boost_dict={}, num_results=10) -> List[SearchResult]:
-        """
-        Searches the index with the given query, filters, and boost parameters.
-
-        Args:
-            query (str): The search query string.
-            boost_dict (dict): Dictionary of boost scores for text fields. Keys are field names and values are the boost scores.
-            num_results (int): The number of top results to return. Defaults to 10.
-
-        Returns:
-            list of dict: List of documents matching the search criteria, ranked by relevance.
-        """
+    def query_to_vecs_scores(self, query:str, boost_dict :dict = {}, num_results : int =10) -> QueryScoresVectors:
         query_vecs = {field: self.vectorizers[field].transform([query]) for field in self.text_fields}
         scores = np.zeros(len(self.docs))
 
@@ -72,28 +62,29 @@ class Index:
         # Use argpartition to get top num_results indices
         top_indices = np.argpartition(scores, -num_results)[-num_results:]
         top_indices = top_indices[np.argsort(-scores[top_indices])]
+        return QueryScoresVectors(query = query, query_vecs=query_vecs, scores=scores, top_indices=top_indices)
 
-        # Filter out zero-score results
-        top_docs = [SearchResult(similarity = scores[i], chunk = self.docs[i]) for i in top_indices if scores[i] > 0]
-        return top_docs
-    
-    def search_by_doc(self, query: str, num_results=10) -> List[SearchResult]:
+    def search(self, query, boost_dict={}, num_results=10) -> List[SearchResult]:
         """
-        Groups search results by document and calculates mean, max, and 1/min similarities.
-        Applies weights (0.9 for max_similarity and 0.1 for mean_similarity) to rank results.
+        Searches the index with the given query, filters, and boost parameters.
 
         Args:
-            index (Index): The index instance used for searching.
             query (str): The search query string.
-            boost_dict (dict): Optional dictionary of boost scores for fields.
+            boost_dict (dict): Dictionary of boost scores for text fields. Keys are field names and values are the boost scores.
             num_results (int): The number of top results to return. Defaults to 10.
 
         Returns:
-            List[SearchResult]: List of search results grouped by document and ranked by similarity.
+            list of dict: List of documents matching the search criteria, ranked by relevance.
         """
-        # Step 1: Call the search function to get top ArticleChunks
-        top_search_results = self.search(query = query, boost_dict = {}, num_results=len(self.docs))
 
+        # Filter out zero-score results
+        query_scores_vectors = self.query_to_vecs_scores(query=query, boost_dict=boost_dict, num_results=num_results)
+        scores, top_indices = query_scores_vectors.scores, query_scores_vectors.top_indices
+        top_docs = [SearchResult(query = query, similarity = scores[i], chunk = self.docs[i]) for i in top_indices] #if scores[i] > 0]
+        return top_docs
+    
+    def group_search_results_by_doc(self, top_search_results: List[SearchResult]) -> List[SearchResultsGroupedByDoc]:
+        query = top_search_results[0].query
         # Step 2: Group results by document using article.info.name
         grouped_results = defaultdict(list)
         for _search_result in top_search_results:
@@ -116,7 +107,8 @@ class Index:
             max_similarity_chunk = doc_search_results_list[np.argmax(similarities)]
 
             # Use chunks[0].article for the article, since all chunks have the same article
-            result = SearchResultsGroupedByDoc(mean_similarity=mean_similarity,
+            result = SearchResultsGroupedByDoc(query=query,
+                                mean_similarity=mean_similarity,
                                 max_similarity=max_similarity,
                                 min_similarity=min_similarity,
                                 weighted_similarity=weighted_similarity,
@@ -127,4 +119,85 @@ class Index:
 
         # Step 6: Sort by weighted_similarity in descending order
         grouped_doc_search_results.sort(key=lambda x: x.weighted_similarity, reverse=True)
+        return grouped_doc_search_results
+
+    def search_by_doc(self, query: str, boost_dict={}, num_results=10) -> List[SearchResultsGroupedByDoc]:
+        """
+        Groups search results by document and calculates mean, max, and 1/min similarities.
+        Applies weights (0.9 for max_similarity and 0.1 for mean_similarity) to rank results.
+
+        Args:
+            index (Index): The index instance used for searching.
+            query (str): The search query string.
+            boost_dict (dict): Optional dictionary of boost scores for fields.
+            num_results (int): The number of top results to return. Defaults to 10.
+
+        Returns:
+            List[SearchResult]: List of search results grouped by document and ranked by similarity.
+        """
+        # Step 1: Call the search function to get top ArticleChunks
+        top_search_results = self.search(query = query, boost_dict = boost_dict, num_results=len(self.docs))
+        grouped_doc_search_results = self.group_search_results_by_doc(top_search_results=top_search_results)
         return grouped_doc_search_results[:num_results]
+    
+    def refine_search(self, search_results: List[SearchResultsGroupedByDoc],
+                      positive: List[str], negative: List[str], alpha=0.8, beta=0.2, gamma=0.1) -> List[SearchResultsGroupedByDoc]:
+        """
+        Refines the search by adjusting the query based on positive and negative feedback.
+
+        Args:
+            search_results (List[SearchResultsGroupedByDoc]): The initial search results.
+            positive (List[str]): List of document names marked as relevant.
+            negative (List[str]): List of document names marked as irrelevant.
+            alpha (float): Weight for the original query vector. Default is 0.8.
+            beta (float): Weight for the positive feedback vector. Default is 0.2.
+            gamma (float): Weight for the negative feedback vector. Default is 0.1.
+            
+        Returns:
+            List[SearchResultsGroupedByDoc]: Updated search results based on feedback.
+        """
+        # Extract the original query vector
+        query = search_results[0].query
+        original_query_vecs = {field: self.vectorizers[field].transform([query]) for field in self.text_fields}
+
+        # Initialize positive and negative vectors for each text field
+        positive_vecs = {field: sparse.csr_matrix(original_query_vecs[field].shape) for field in self.text_fields}
+        negative_vecs = {field: sparse.csr_matrix(original_query_vecs[field].shape) for field in self.text_fields}
+
+        # Accumulate vectors for positive and negative feedback
+        for search_result in search_results:
+            doc_name = search_result.article.info.name
+            
+            if doc_name in positive:
+                for field in self.text_fields:
+                    pos_vec = self.vectorizers[field].transform([search_result.max_similarity_chunk.chunk.chunk_text])
+                    positive_vecs[field] += pos_vec
+                
+            elif doc_name in negative:
+                for field in self.text_fields:
+                    neg_vec = self.vectorizers[field].transform([search_result.max_similarity_chunk.chunk.chunk_text])
+                    negative_vecs[field] += neg_vec
+
+        #Calculate the new query vector by combining original, positive, and negative feedback
+        refined_query_vecs = {}
+        for field in self.text_fields:
+            refined_query_vecs[field] = (
+                alpha * original_query_vecs[field] +
+                beta * positive_vecs[field] -
+                gamma * negative_vecs[field]
+            )
+
+        #Re-run the search using the updated query vector
+        scores = np.zeros(len(self.docs))
+        
+        for field, query_vec in refined_query_vecs.items():
+            sim = cosine_similarity(query_vec, self.text_matrices[field]).flatten()
+            scores += sim
+
+        num_results = min(len(self.docs), len(scores))
+        top_indices = np.argpartition(scores, -num_results)[-num_results:]
+        top_indices = top_indices[np.argsort(-scores[top_indices])]
+
+        # Return updated search results grouped by document
+        top_docs = [SearchResult(query = query, similarity=scores[i], chunk=self.docs[i]) for i in top_indices]# if scores[i] > 0]
+        return self.group_search_results_by_doc(top_search_results=top_docs)
