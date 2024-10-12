@@ -22,6 +22,9 @@ class Config:
         self.SEARCH_REFINED_BETA = self._get_env_var("SEARCH_REFINED_BETA", float)
         self.SEARCH_REFINED_GAMMA = self._get_env_var("SEARCH_REFINED_GAMMA", float)
 
+        #Initialize other support variables for the app
+        self.last_search_result = None
+        
         # Initialize based on other properties
         self._wiki_search = ScrapperWikipedia()
         self._index = Index(text_fields=ArticleChunk.get_text_fields_names(), vectorizer_params={})
