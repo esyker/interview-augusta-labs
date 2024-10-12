@@ -1,73 +1,88 @@
-from fastapi import FastAPI, HTTPException, Query
-from typing import List, Dict, Optional
-import wikipediaapi
-import random
-import time
+from fastapi import FastAPI, Query
+from typing import List, Optional
+from config import Config
+from utils.scrapper_wikipedia import ScrapperWikipedia
+from utils.chunking_models import ChunkingModel
+from utils.index import Index
+from utils.typedefs import ArticleInfo, Article, ArticleChunk, QueryScoresVectors, SearchResult, SearchResultsGroupedByDoc
 
 app = FastAPI()
 
-# Simulated database for articles and feedback
-articles_db = {}
-feedback_db = {}
+config = Config()
 
-# Wikipedia API initialization
-wiki = wikipediaapi.Wikipedia('pt')
+# Define API endpoints
 
-def fetch_latest_wikipedia_articles(limit=10000) -> List[Dict]:
-    # Simulate fetching the latest 10,000 Portuguese articles from Wikipedia
-    # The actual fetching can use scraping or an API wrapper for Wikipedia
-    articles = [{"id": i, "title": f"Article {i}", "content": f"Content for article {i}"} for i in range(limit)]
-    return articles
+@app.get("/wikipedia/list_last_pt_articles", response_model=List[ArticleInfo])
+def wikipedia_list_last_pt_articles(total_limit: int = Query(config.SCRAPING_RESULTS_LIMIT, description="Limit the number of results")):
+    """Fetches the last Portuguese articles from Wikipedia."""
+    return config.wiki_search.list_last_pt_articles(total_limit=total_limit)
 
-def generate_tldr(article_content: str, user_interests: str) -> str:
-    # Simulated TLDR generator (should be replaced with an actual NLP-based summary)
-    return article_content[:300] + "..."
+@app.get("/wikipedia/get_last_pt_articles", response_model=List[Article])
+def wikipedia_get_last_pt_articles(
+    total_limit: int = Query(config.SCRAPING_RESULTS_LIMIT, description="Total articles to scrape"),
+    requests_per_second: int = Query(config.SCRAPING_REQUESTS_PER_SECOND, description="Requests per second for scraping"),
+    processing_type: str = Query(config.SCRAPING_TYPE, description="Type of processing to use"),
+    verbose: bool = Query(config.VERBOSE, description="Enable verbose logging")
+):
+    """Fetches and scrapes the last Portuguese articles from Wikipedia."""
+    return config.wiki_search.get_last_pt_articles(
+        total_limit=total_limit,
+        requests_per_second=requests_per_second,
+        processing_type=processing_type,
+        verbose=verbose
+    )
 
-def find_relevant_articles(user_interests: str) -> List[Dict]:
-    # Fetch articles and simulate relevance matching
-    latest_articles = fetch_latest_wikipedia_articles()
-    relevant_articles = random.sample(latest_articles, 10)  # Simulated random relevance for demo purposes
-    return relevant_articles
+@app.post("/wikipedia/article_chunks", response_model=List[ArticleChunk])
+def wikipedia_get_article_chunks(articles: List[Article]):
+    """Get article chunks from the provided list of articles."""
+    return config.wiki_search.get_articles_chunks(articles=articles, chunking_model=config.chunking_model)
 
-@app.post("/search/")
-def search_articles(user_interests: str, feedback: Optional[Dict[int, str]] = None):
-    start_time = time.time()
+@app.post("/index/fit", response_model=Index)
+def index_fit(docs: List[ArticleChunk]):
+    """Fit an index with the provided article chunks."""
+    return config.index.fit(docs=docs)
 
-    # Find relevant articles
-    relevant_articles = find_relevant_articles(user_interests)
-    
-    # Apply feedback loop (if any feedback exists)
-    if feedback:
-        # Simulate refining based on feedback
-        refined_articles = [article for article in relevant_articles if feedback.get(article["id"]) == "thumbs_up"]
-        if refined_articles:
-            relevant_articles = refined_articles
-    
-    # Generate TLDR for each article
-    results = []
-    for article in relevant_articles:
-        tldr = generate_tldr(article["content"], user_interests)
-        results.append({
-            "title": article["title"],
-            "tldr": tldr,
-            "url": f"https://pt.wikipedia.org/wiki/{article['title'].replace(' ', '_')}"
-        })
-    
-    # Check if the process takes less than 1 minute
-    elapsed_time = time.time() - start_time
-    if elapsed_time > 60:
-        raise HTTPException(status_code=408, detail="The request took too long to process")
-    
-    return {"results": results, "processing_time": elapsed_time}
+@app.get("/index/search", response_model=List[SearchResult])
+def index_search(
+    query: str = Query(..., description="Search query"),
+    num_results: int = Query(config.SEARCH_RESULTS_LIMIT, description="Number of results to return")
+):
+    """Search the index with a given query."""
+    return config.index.search(query, boost_dict={}, num_results=num_results)
 
-@app.post("/feedback/")
-def submit_feedback(article_id: int, feedback: str):
-    # Simulate storing feedback (thumbs_up/thumbs_down)
-    feedback_db[article_id] = feedback
-    return {"message": "Feedback recorded"}
+@app.get("/index/search_grouped_by_doc", response_model=List[SearchResultsGroupedByDoc])
+def index_search_grouped_by_doc(
+    query: str = Query(..., description="Search query"),
+    num_results: int = Query(config.SEARCH_RESULTS_LIMIT, description="Number of results to return")
+):
+    """Search the index and group results by document."""
+    return config.index.search_by_doc(query=query, boost_dict={}, num_results=num_results)
 
-# Example GET endpoint to retrieve all feedback
-@app.get("/feedback/")
-def get_feedback():
-    return feedback_db
+@app.post("/index/refined_search", response_model=List[SearchResultsGroupedByDoc])
+def index_refined_search(
+    search_results: List[SearchResultsGroupedByDoc],
+    positive: List[str],
+    negative: List[str]
+):
+    """Refine the search results based on positive and negative feedback."""
+    return config.index.refine_search(
+        search_results=search_results,
+        positive=positive,
+        negative=negative,
+        alpha=config.SEARCH_REFINED_ALPHA,
+        beta=config.SEARCH_REFINED_BETA,
+        gamma=config.SEARCH_REFINED_GAMMA
+    )
 
+@app.get("/user/query_results", response_model=List[SearchResultsGroupedByDoc])
+def user_get_query_results(
+    query: str = Query(..., description="Search query"),
+    top_k: int = Query(config.SEARCH_RESULTS_LIMIT, description="Number of results to return"),
+    scrapping_total_limit: int = Query(config.SCRAPING_RESULTS_LIMIT, description="Limit for scraping articles")
+):
+    """Get refined query results by scraping articles, chunking them, and performing a search."""
+    docs = config.wiki_search.get_last_pt_articles(total_limit=scrapping_total_limit)
+    docs_chunks = config.wiki_search.get_articles_chunks(articles=docs, chunking_model=config.chunking_model)
+    index = config.index.fit(docs=docs_chunks)
+    search_docs = config.index.search_by_doc(query=query, boost_dict={}, num_results=top_k)
+    return search_docs

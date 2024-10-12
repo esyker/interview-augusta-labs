@@ -64,7 +64,7 @@ class Index:
         top_indices = top_indices[np.argsort(-scores[top_indices])]
         return QueryScoresVectors(query = query, query_vecs=query_vecs, scores=scores, top_indices=top_indices)
 
-    def search(self, query, boost_dict={}, num_results=10) -> List[SearchResult]:
+    def search(self, query : str, boost_dict : dict ={}, num_results : int = 10) -> List[SearchResult]:
         """
         Searches the index with the given query, filters, and boost parameters.
 
