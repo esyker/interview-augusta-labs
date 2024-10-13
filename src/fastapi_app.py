@@ -6,7 +6,7 @@ from config import Config
 from utils.scrapper_wikipedia import ScrapperWikipedia
 from utils.chunking_models import ChunkingModel
 from utils.index import Index
-from utils.typedefs import ArticleInfo, Article, ArticleChunk, QueryScoresVectors, SearchResult, SearchResultsGroupedByDoc
+from utils.typedefs import ArticleInfo, Article, ArticleChunk, QueryScoresVectors, SearchResult, SearchResultsGroupedByDoc, DisplaySearchResult
 
 app = FastAPI()
 
@@ -55,11 +55,16 @@ def user_articles_chunks(
     
     return docs_chunks
 
-@app.get("/user/query_refined", response_model=List[SearchResultsGroupedByDoc])
+def convert_search_results_to_display(response_model=List[SearchResultsGroupedByDoc])  -> List[DisplaySearchResult]:
+    return [DisplaySearchResult(tldr=_search_result.article.summary, 
+                                url = _search_result.max_similarity_chunk.chunk.article_section.url,
+                                weighted_similarity=_search_result.weighted_similarity) for _search_result in response_model]
+
+@app.get("/user/query_refined", response_model=List[DisplaySearchResult])
 def user_query_refined(
     positive: List[str] = Query(..., description="List of positive terms to refine search"),
     negative: List[str] = Query(..., description="List of negative terms to refine search")
-) -> List[SearchResultsGroupedByDoc]:
+):
     # Check if there is a previous search result
     if not config.last_search_result:
         raise HTTPException(
@@ -67,17 +72,19 @@ def user_query_refined(
             detail="Application error: No previous search found!"
         )
     
-    search_results = config.last_search_result
-    return config.index.refine_search(
-        search_results=search_results,
+    
+    search_docs = config.index.refine_search(
+        search_results=config.last_search_result,
         positive=positive,
         negative=negative,
         alpha=config.SEARCH_REFINED_ALPHA,
         beta=config.SEARCH_REFINED_BETA,
         gamma=config.SEARCH_REFINED_GAMMA
     )
+    config.last_search_result = search_docs
+    return convert_search_results_to_display(search_docs)
 
-@app.get("/user/query_results", response_model=List[SearchResultsGroupedByDoc])
+@app.get("/user/query_results", response_model=List[DisplaySearchResult])
 def user_query_results(
     query: str,
     top_k: int = Query(config.SEARCH_RESULTS_LIMIT, description="Number of search results to return"),
@@ -99,7 +106,7 @@ def user_query_results(
     # Perform the search using the provided query
     search_docs = config.index.search_by_doc(query=query, boost_dict={}, num_results=top_k)
     config.last_search_result = search_docs
-    return search_docs
+    return convert_search_results_to_display(search_docs)
 
 
 

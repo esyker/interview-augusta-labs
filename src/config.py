@@ -6,7 +6,11 @@ from utils.index import Index
 from utils.typedefs import ArticleChunk
 
 class Config:
-    def __init__(self, file_path: str = ".env"):
+    def __init__(self, file_path: str = None):
+        # If file_path is None, use the current directory with "/.env"
+        if file_path is None:
+            file_path = os.path.join(os.path.dirname(__file__), ".env")
+            
         # Load environment variables
         load_dotenv(dotenv_path=file_path)
 
@@ -21,12 +25,17 @@ class Config:
         self.SEARCH_REFINED_ALPHA = self._get_env_var("SEARCH_REFINED_ALPHA", float)
         self.SEARCH_REFINED_BETA = self._get_env_var("SEARCH_REFINED_BETA", float)
         self.SEARCH_REFINED_GAMMA = self._get_env_var("SEARCH_REFINED_GAMMA", float)
+        self.WIKIPEDIA_API_CLIENT_ID = self._get_env_var("WIKIPEDIA_API_CLIENT_ID", str)
+        self.WIKIPEDIA_API_CLIENT_SECRET = self._get_env_var("WIKIPEDIA_API_CLIENT_SECRET", str)
+        self.WIKIPEDIA_API_ACCESS_TOKEN = self._get_env_var("WIKIPEDIA_API_ACCESS_TOKEN", str)
 
         #Initialize other support variables for the app
         self.last_search_result = None
         
         # Initialize based on other properties
-        self._wiki_search = ScrapperWikipedia()
+        self._wiki_search = ScrapperWikipedia(client_id=self.WIKIPEDIA_API_CLIENT_ID,
+                                              client_secret=self.WIKIPEDIA_API_CLIENT_SECRET,
+                                              access_token=self.WIKIPEDIA_API_ACCESS_TOKEN)
         self._index = Index(text_fields=ArticleChunk.get_text_fields_names(), vectorizer_params={})
         self._chunking_model = ChunkingModel(chunk_size=self.CHUNK_SIZE, chunk_overlap=self.CHUNK_OVERLAP)
 

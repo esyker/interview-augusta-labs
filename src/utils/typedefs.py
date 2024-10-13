@@ -48,7 +48,7 @@ class ArticleSection(DictMixin):
 class Article(DictMixin):
     info: ArticleInfo
     summary : str
-    sections: Dict[str, ArticleSection]
+    sections: List[ArticleSection]
     
 @dataclass
 class ArticleChunk(DictMixin):
@@ -91,3 +91,9 @@ class SearchResultsGroupedByDoc(DictMixin):
     min_similarity : float
     article : Article
     search_results_list : List[SearchResult]
+
+@dataclass
+class DisplaySearchResult(DictMixin):
+    tldr : str
+    url : str
+    weighted_similarity : float
