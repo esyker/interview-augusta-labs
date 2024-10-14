@@ -91,6 +91,7 @@ class SearchResultsGroupedByDoc(DictMixin):
     min_similarity : float
     article : Article
     search_results_list : List[SearchResult]
+    top_k : int
 
 @dataclass
 class DisplaySearchResult(DictMixin):

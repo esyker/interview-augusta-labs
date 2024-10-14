@@ -114,7 +114,8 @@ class Index:
                                 weighted_similarity=weighted_similarity,
                                 article=doc_search_results_list[0]['chunk']['article'],
                                 max_similarity_chunk=max_similarity_chunk,
-                                search_results_list=doc_search_results_list)
+                                search_results_list=doc_search_results_list,
+                                top_k=len(top_search_results))
             grouped_doc_search_results.append(result)
 
         # Step 6: Sort by weighted_similarity in descending order
@@ -141,7 +142,8 @@ class Index:
         return grouped_doc_search_results[:num_results]
     
     def refine_search(self, search_results: List[SearchResultsGroupedByDoc],
-                      positive: List[str], negative: List[str], alpha=0.8, beta=0.2, gamma=0.1) -> List[SearchResultsGroupedByDoc]:
+                      positive: List[str], negative: List[str], alpha=0.8, beta=0.2, gamma=0.1,
+                       top_k : int = 10) -> List[SearchResultsGroupedByDoc]:
         """
         Refines the search by adjusting the query based on positive and negative feedback.
 
@@ -194,10 +196,11 @@ class Index:
             sim = cosine_similarity(query_vec, self.text_matrices[field]).flatten()
             scores += sim
 
-        num_results = min(len(self.docs), len(scores))
+        num_results = len(self.docs)
         top_indices = np.argpartition(scores, -num_results)[-num_results:]
         top_indices = top_indices[np.argsort(-scores[top_indices])]
 
         # Return updated search results grouped by document
         top_docs = [SearchResult(query = query, similarity=scores[i], chunk=self.docs[i]) for i in top_indices]# if scores[i] > 0]
-        return self.group_search_results_by_doc(top_search_results=top_docs)
+        num_results = min(len(self.docs), top_k)
+        return self.group_search_results_by_doc(top_search_results=top_docs)[:num_results]

@@ -37,16 +37,18 @@ http://127.0.0.1:8000/wikipedia/get_last_pt_articles?total_limit=5&requests_per_
 ```
 
 - Get the results for a user query:
-```shell
-http://127.0.0.1:8000/user/query_results?query=Machine%20Learning&top_k=5&scrapping_total_limit=10
-``` 
 
-OR
 ```shell
-http://127.0.0.1:8000/user/query_results?query=Hist%C3%B3ria&top_k=20&scrapping_total_limit=50
+http://127.0.0.1:8000/user/query_results?query=Hist%C3%B3ria&top_k=10&scrapping_total_limit=50&reuse_index=False
 ```
+
+OR for reusing the index:
+
+```shell
+http://127.0.0.1:8000/user/query_results?query=Machine%20Learning&top_k=5&scrapping_total_limit=10&reuse_index=True
+``` 
 
 - Get refined search:
 ```shell
-http://127.0.0.1:8000/user/query_refined?positive=Museo_Travesti_del_Per%C3%BA&negative=Estudos_transg%C3%AAnero&negative=One_of_Ours
+http://127.0.0.1:8000/user/query_refined?top_k=5&positive=Museo_Travesti_del_Per%C3%BA&negative=Estudos_transg%C3%AAnero&negative=One_of_Ours
 ```

@@ -64,8 +64,9 @@ def convert_search_results_to_display(response_model=List[SearchResultsGroupedBy
 
 @app.get("/user/query_refined", response_model=List[DisplaySearchResult])
 def user_query_refined(
-    positive: List[str] = Query(..., description="List of positive terms to refine search"),
-    negative: List[str] = Query(..., description="List of negative terms to refine search")
+    top_k : int = Query(config.SEARCH_RESULTS_LIMIT, description="Number of search results to return"),
+    positive: List[str] = Query([], description="List of positive terms to refine search"),
+    negative: List[str] = Query([], description="List of negative terms to refine search")
 ):
     # Check if there is a previous search result
     if not config.last_search_result:
@@ -79,6 +80,7 @@ def user_query_refined(
         search_results=config.last_search_result,
         positive=positive,
         negative=negative,
+        top_k= top_k,
         alpha=config.SEARCH_REFINED_ALPHA,
         beta=config.SEARCH_REFINED_BETA,
         gamma=config.SEARCH_REFINED_GAMMA
