@@ -94,6 +94,7 @@ class SearchResultsGroupedByDoc(DictMixin):
 
 @dataclass
 class DisplaySearchResult(DictMixin):
+    summary : str
     tldr : str
     url : str
     weighted_similarity : float

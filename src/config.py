@@ -4,6 +4,7 @@ from utils.scrapper_wikipedia import ScrapperWikipedia
 from utils.chunking_models import ChunkingModel
 from utils.index import Index
 from utils.typedefs import ArticleChunk
+from utils.llm_models_openai import OpenAIModel
 
 class Config:
     def __init__(self, file_path: str = None):
@@ -28,6 +29,7 @@ class Config:
         self.WIKIPEDIA_API_CLIENT_ID = self._get_env_var("WIKIPEDIA_API_CLIENT_ID", str)
         self.WIKIPEDIA_API_CLIENT_SECRET = self._get_env_var("WIKIPEDIA_API_CLIENT_SECRET", str)
         self.WIKIPEDIA_API_ACCESS_TOKEN = self._get_env_var("WIKIPEDIA_API_ACCESS_TOKEN", str)
+        self.OPENAI_API_KEY = self._get_env_var("OPENAI_API_KEY", str)
 
         #Initialize other support variables for the app
         self.last_search_result = None
@@ -38,6 +40,7 @@ class Config:
                                               access_token=self.WIKIPEDIA_API_ACCESS_TOKEN)
         self._index = Index(text_fields=ArticleChunk.get_text_fields_names(), vectorizer_params={})
         self._chunking_model = ChunkingModel(chunk_size=self.CHUNK_SIZE, chunk_overlap=self.CHUNK_OVERLAP)
+        self._openai_model = OpenAIModel(api_key=self.OPENAI_API_KEY)
 
     @staticmethod
     def strtobool(val: str) -> bool:
@@ -81,3 +84,7 @@ class Config:
     @property
     def chunking_model(self) -> ChunkingModel:
         return self._chunking_model
+    
+    @property
+    def openai_model(self) -> OpenAIModel:
+        return self._openai_model

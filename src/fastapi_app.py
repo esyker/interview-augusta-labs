@@ -56,7 +56,9 @@ def user_articles_chunks(
     return docs_chunks
 
 def convert_search_results_to_display(response_model=List[SearchResultsGroupedByDoc])  -> List[DisplaySearchResult]:
-    return [DisplaySearchResult(tldr=_search_result.article.summary, 
+    return [DisplaySearchResult(tldr = config.openai_model.get_tldr(user_query = _search_result.query,
+                                    article_text = "\n".join(_section.text for _section in _search_result.article.sections)),
+                                summary=_search_result.article.summary, 
                                 url = _search_result.max_similarity_chunk.chunk.article_section.url,
                                 weighted_similarity=_search_result.weighted_similarity) for _search_result in response_model]
 
