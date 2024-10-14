@@ -90,21 +90,23 @@ def user_query_refined(
 def user_query_results(
     query: str,
     top_k: int = Query(config.SEARCH_RESULTS_LIMIT, description="Number of search results to return"),
-    scrapping_total_limit: int = Query(config.SCRAPING_RESULTS_LIMIT, description="Total articles to scrape")
+    scrapping_total_limit: int = Query(config.SCRAPING_RESULTS_LIMIT, description="Total articles to scrape"),
+    reuse_index: bool = Query(True, description="Whether to reuse the existing index or rebuild it")
 ):
     """Fetches articles, chunks them, fits the index, and returns search results based on the user's query."""
-    # Fetch the last Portuguese articles from Wikipedia
-    docs = config.wiki_search.get_last_pt_articles(total_limit=scrapping_total_limit,
-                                                   requests_per_second=config.SCRAPING_REQUESTS_PER_SECOND,
-                                                   processing_type=config.SCRAPING_TYPE,
-                                                   verbose=config.VERBOSE)
-    
-    # Get article chunks from the scraped articles
-    docs_chunks = config.wiki_search.get_articles_chunks(articles=docs, chunking_model=config.chunking_model)
-    
-    # Fit the index with the document chunks
-    index = config.index.fit(docs=docs_chunks)
-    
+    #Check if the index should be rebuilt
+    if not reuse_index or len(config.index.docs)==0:
+        # Fetch the last Portuguese articles from Wikipedia
+        docs = config.wiki_search.get_last_pt_articles(total_limit=scrapping_total_limit,
+                                                    requests_per_second=config.SCRAPING_REQUESTS_PER_SECOND,
+                                                    processing_type=config.SCRAPING_TYPE,
+                                                    verbose=config.VERBOSE)
+        
+        # Get article chunks from the scraped articles
+        docs_chunks = config.wiki_search.get_articles_chunks(articles=docs, chunking_model=config.chunking_model)
+        
+        # Fit the index with the document chunks
+        index = config.index.fit(docs=docs_chunks)
     # Perform the search using the provided query
     search_docs = config.index.search_by_doc(query=query, boost_dict={}, num_results=top_k)
     config.last_search_result = search_docs
