@@ -1,5 +1,10 @@
 # Interview Augusta Labs
 
+## Preview
+
+https://github.com/user-attachments/assets/c28fe6ce-23d1-4115-bb78-fe77e0fd9b1a
+
+
 ## Requirements
 
 `requirements.txt` was created using:
