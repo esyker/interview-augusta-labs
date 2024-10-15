@@ -95,6 +95,7 @@ class SearchResultsGroupedByDoc(DictMixin):
 
 @dataclass
 class DisplaySearchResult(DictMixin):
+    name : str
     summary : str
     tldr : str
     url : str

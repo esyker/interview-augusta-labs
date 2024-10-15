@@ -21,10 +21,17 @@ pip install -r requirements.txt
 
 ## Running
 
-To run the app:
+To run the backend:
 ```shell
-cd src
-uvicorn fastapi_app:app --reload
+cd src/backend
+python main.py
+```
+
+To run the frontend:
+```shell
+cd src/frontend
+npm install
+npm start
 ```
 
 ## Requests

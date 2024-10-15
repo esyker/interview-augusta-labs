@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
-from utils.scrapper_wikipedia import ScrapperWikipedia
-from utils.chunking_models import ChunkingModel
-from utils.index import Index
-from utils.typedefs import ArticleChunk
-from utils.llm_models_openai import OpenAIModel
+from app.utils.scrapper_wikipedia import ScrapperWikipedia
+from app.utils.chunking_models import ChunkingModel
+from app.utils.index import Index
+from app.utils.typedefs import ArticleChunk
+from app.utils.llm_models_openai import OpenAIModel
 
 class Config:
     def __init__(self, file_path: str = None):

@@ -1,23 +1,46 @@
-# Use official Python image as the base image
-FROM python:3.12-slim
+# Stage 1: Build the frontend
+FROM node:18-slim AS frontend
 
-# Set the working directory in the container
-WORKDIR /app
+# Set the working directory for the frontend
+WORKDIR /app/src/frontend
 
-# Copy the requirements.txt file to the working directory
-COPY requirements.txt .
+# Copy the package.json and package-lock.json to the container
+COPY src/frontend/package*.json ./
 
-# Install the dependencies
+# Install the frontend dependencies
+RUN npm install
+
+# Stage 2: Set up the backend
+FROM python:3.12-slim AS backend
+
+# Set the working directory for the backend
+WORKDIR /app/src/backend
+
+# Copy the backend requirements.txt file to the container
+COPY src/backend/requirements.txt .
+
+# Install the backend dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the project files to the container
-COPY . .
+# Copy the backend code to the container
+COPY src/backend .
 
-# Change to the 'src' directory
-WORKDIR /app/src
-
-# Expose the port that the app will run on
+# Expose the port that the FastAPI app will run on
 EXPOSE 8000
 
-# Command to run the FastAPI app with Uvicorn
-CMD ["uvicorn", "fastapi_app:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+# Stage 3: Final image for running both the frontend and backend
+FROM python:3.12-slim
+
+# Copy the installed frontend and backend from previous stages
+COPY --from=frontend /app/src/frontend /app/src/frontend
+COPY --from=backend /app/src/backend /app/src/backend
+
+# Set the working directory to backend and run FastAPI server
+WORKDIR /app/src/backend
+CMD ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+
+# Expose the backend port
+EXPOSE 8000
+
+# Open a port for frontend if necessary (if you'd like to serve it inside the same container)
+EXPOSE 3000

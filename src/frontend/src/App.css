@@ -1,0 +1,38 @@
+/* Define the primary and secondary colors in HEX */
+.primary-color {
+  color: #1A73E8; /* Primary color: Blue */
+}
+
+.secondary-color {
+  background-color: #adc9f7; /* Secondary color: Blue */
+  color: #ffffff; /* Text color white */
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 5px;
+  margin-top: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.secondary-color:hover {
+  background-color: #1558b1; /* Darker blue for hover effect */
+}
+
+/* Optional: Style the button for a better appearance */
+button {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Add some spacing and basic alignment */
+h1, h2 {
+  margin-bottom: 10px;
+}
+
+/* Set background color for the whole app */
+body {
+  background-color: #e3e4eb; /* Light grayish-blue background for the app */
+  margin: 0;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}

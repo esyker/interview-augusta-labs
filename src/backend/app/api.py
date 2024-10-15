@@ -1,16 +1,25 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from fastapi import HTTPException, status
-from typing import List, Optional
-from config import Config
-from utils.scrapper_wikipedia import ScrapperWikipedia
-from utils.chunking_models import ChunkingModel
-from utils.index import Index
-from utils.typedefs import ArticleInfo, Article, ArticleChunk, QueryScoresVectors, SearchResult, SearchResultsGroupedByDoc, DisplaySearchResult
-
-app = FastAPI()
+from typing import List
+from app.config import Config
+from app.utils.typedefs import ArticleInfo, Article, ArticleChunk, SearchResultsGroupedByDoc, DisplaySearchResult
 
 config = Config()
+app = FastAPI()
+
+origins = [
+    "http://localhost:3000",
+    "localhost:3000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 # Define API endpoints
 @app.get("/")
@@ -56,7 +65,8 @@ def user_articles_chunks(
     return docs_chunks
 
 def convert_search_results_to_display(response_model=List[SearchResultsGroupedByDoc])  -> List[DisplaySearchResult]:
-    return [DisplaySearchResult(tldr = config.openai_model.get_tldr(user_query = _search_result.query,
+    return [DisplaySearchResult(name = _search_result.article.info.name,
+                                tldr = config.openai_model.get_tldr(user_query = _search_result.query,
                                     article_text = "\n".join(_section.text for _section in _search_result.article.sections)),
                                 summary=_search_result.article.summary, 
                                 url = _search_result.max_similarity_chunk.chunk.article_section.url,
@@ -113,7 +123,6 @@ def user_query_results(
     search_docs = config.index.search_by_doc(query=query, boost_dict={}, num_results=top_k)
     config.last_search_result = search_docs
     return convert_search_results_to_display(search_docs)
-
 
 
 
