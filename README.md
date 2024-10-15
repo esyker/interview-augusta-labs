@@ -2,8 +2,7 @@
 
 ## Preview
 
-https://github.com/user-attachments/assets/c28fe6ce-23d1-4115-bb78-fe77e0fd9b1a
-
+https://github.com/user-attachments/assets/8b0de958-c27c-4032-a350-b63aa7bd1c81
 
 ## Requirements
 
